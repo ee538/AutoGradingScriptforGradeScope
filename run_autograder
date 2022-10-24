@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+
+import os, json
+from unittest import TestResult
+
+def exec_cmd(cmd):
+    r = os.popen(cmd)
+    text = r.read()
+    r.close()
+    print(text)
+    return text
+
+def run_test(q_num):
+    test_cmd = 'bazel test files/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
+    test_output = exec_cmd(test_cmd)
+    return {
+        'passed':           test_output.count('OK'),
+        'failed':           test_output.count('FAIL'),
+        'memory_misuse':    test_output.count('AddressSanitizer'),
+    }
+
+def output_json(score_obj):
+    # reference: https://gradescope-autograders.readthedocs.io/en/latest/specs/#output-format
+    dict_obj = {
+        'visibility':       'after_published',
+        'stdout_visibility':'after_published',
+        'tests':            score_obj,
+    }
+    with open('/autograder/results/results.json', "w") as outfile:
+        json.dumps(dict_obj, outfile, indent = 4) 
+
+if __name__ == '__main__':
+
+    total_coding_score = 0.0;
+    q_nums = []
+    full_score = {}
+    test_cases = {}
+    total_result = []
+    visible_list = []
+
+    with open('./source/questions.json', encoding='utf-8') as q:
+        questions = json.load(q)
+        q_nums = questions.get('q_nums')
+        full_score = questions.get('full_score')
+        test_cases = questions.get('test_cases')
+        visible_list = questions.get('visible_list')
+    
+    score_per_test = { q_num: (full_score[q_num] * 2 // test_cases[q_num]) / 2 for q_num in q_nums }
+    for q_num in q_nums:
+        test_result = run_test(q_num)
+        score = 0.0
+
+        if test_result['passed'] < test_cases[q_num]:
+            score = test_result['passed'] * score_per_test[q_num]
+        else:
+            score = full_score[q_num]
+
+        if test_result['memory_misuse'] != 0:       # if memory misuse is detected, score will be deducted by 50%
+            score = (score * 2 + 1) // 2 / 2
+        elif test_result['passed'] + test_result['failed'] != test_cases[q_num]:    # if this happens, student might cheat 
+            score = 0.0
+
+        total_result.append({
+            'score':        score,
+            'max_score':    full_score[q_num],
+            'number':       q_num,
+            'visibility':   'visible' if q_num in visible_list else 'after_due_date',
+            'output':       'Memory misuse detected!' if test_result['memory_misuse'] != 0 else 'No memory misuse detected!'
+        })
