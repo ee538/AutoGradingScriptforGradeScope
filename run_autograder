@@ -14,7 +14,7 @@ def run_test(q_num):
     test_cmd = 'bazel test files/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
     test_output = exec_cmd(test_cmd)
     return {
-        'passed':           test_output.count('OK'),
+        'passed':           test_output.count('[       OK ]'),
         'failed':           test_output.count('FAIL'),
         'memory_misuse':    test_output.count('AddressSanitizer'),
     }
