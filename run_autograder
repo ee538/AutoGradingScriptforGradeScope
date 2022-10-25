@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
         if test_result['memory_misuse'] != 0:       # if memory misuse is detected, score will be deducted by 50%
             score = (score * 2 + 1) // 2 / 2
-        elif test_result['passed'] + test_result['failed'] != test_cases[q_num]:    # if this happens, student might cheat 
+        elif test_result['passed'] >= test_cases[q_num] and test_result['failed'] != 0:    # if this happens, student might cheat 
             score = 0.0
 
         total_result.append({
