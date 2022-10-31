@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os, json
-from unittest import TestResult
+# from unittest import TestResult
 
 def exec_cmd(cmd):
     r = os.popen(cmd)
@@ -11,8 +11,13 @@ def exec_cmd(cmd):
     return text
 
 def run_test(q_num):
-    test_cmd = 'bazel test files/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
+
+    cp_cmd = 'cp submission/files/' + q_num + '/q.cc coding_grader/files/' + q_num + '/'
+    test_cmd = 'bazel test coding_grader/files/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
+
+    exec_cmd(cp_cmd)
     test_output = exec_cmd(test_cmd)
+
     return {
         'passed':           test_output.count('[       OK ]'),
         'failed':           test_output.count('FAIL'),
@@ -26,7 +31,9 @@ def output_json(score_obj):
         'stdout_visibility':'after_published',
         'tests':            score_obj,
     }
-    with open('/autograder/results/results.json', "w") as outfile:
+    if not os.path.exists('results/'):
+        os.mkdir('results/')
+    with open('results/results.json', "w") as outfile:
         json.dumps(dict_obj, outfile, indent = 4) 
 
 if __name__ == '__main__':
@@ -38,9 +45,10 @@ if __name__ == '__main__':
     total_result = []
     visible_list = []
 
-    with open('./source/questions.json', encoding='utf-8') as q:
+    with open('source/questions.json', encoding='utf-8') as q:
         questions = json.load(q)
         q_nums = questions.get('q_nums')
+        q_nums = [str(q_num) for q_num in q_nums]
         full_score = questions.get('full_score')
         test_cases = questions.get('test_cases')
         visible_list = questions.get('visible_list')
