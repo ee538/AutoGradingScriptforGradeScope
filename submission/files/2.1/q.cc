@@ -1,10 +1,22 @@
 #include "q.h"
 
-#include <cmath>
+#include <algorithm>
 #include <iostream>
-#include <list>
-#include <string>
 #include <vector>
-// TODO:
-// 1. Implement the the functions in q.h.
-// 2. Write some unit tests for them in student_test.cc
+
+int CountCharacters(std::string& input, std::vector<char> characters) {
+  int result = 0;
+  std::vector<char> characters_lower_case(characters.size());
+
+  std::transform(characters.begin(), characters.end(),
+                 characters_lower_case.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+
+  for (auto c : input) {
+    if (std::find(characters_lower_case.begin(), characters_lower_case.end(),
+                  std::tolower(c)) != characters_lower_case.end()) {
+      result++;
+    }
+  }
+  return result;
+}

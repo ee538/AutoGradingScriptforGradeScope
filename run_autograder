@@ -12,9 +12,10 @@ def exec_cmd(cmd):
 
 def run_test(q_num):
 
-    cp_cmd = 'cp submission/files/' + q_num + '/q.cc coding_grader/files/' + q_num + '/'
-    test_cmd = 'bazel test coding_grader/files/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
+    cp_cmd = 'cp ../submission/files/' + q_num + '/q.cc coding_grader/' + q_num + '/'
+    test_cmd = 'bazel test coding_grader/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
 
+    print('================================================================================\nQuestion ' + q_num + ' testing:')
     exec_cmd(cp_cmd)
     test_output = exec_cmd(test_cmd)
 
@@ -31,21 +32,22 @@ def output_json(score_obj):
         'stdout_visibility':'after_published',
         'tests':            score_obj,
     }
-    if not os.path.exists('results/'):
-        os.mkdir('results/')
-    with open('results/results.json', "w") as outfile:
-        json.dumps(dict_obj, outfile, indent = 4) 
+    if not os.path.exists('../results/'):
+        os.mkdir('../results/')
+    with open('../results/results.json', "w") as outfile:
+        outfile.writelines(json.dumps(dict_obj, indent = 4))
 
 if __name__ == '__main__':
-
-    total_coding_score = 0.0;
+    
+    os.chdir('./source/')
+    total_coding_score = 0.0
     q_nums = []
     full_score = {}
     test_cases = {}
     total_result = []
     visible_list = []
 
-    with open('source/questions.json', encoding='utf-8') as q:
+    with open('questions.json', encoding='utf-8') as q:
         questions = json.load(q)
         q_nums = questions.get('q_nums')
         q_nums = [str(q_num) for q_num in q_nums]
@@ -77,3 +79,5 @@ if __name__ == '__main__':
             'visibility':   'visible' if q_num in visible_list else 'after_due_date',
             'output':       'Memory misuse detected!' if test_result['memory_misuse'] != 0 else 'No memory misuse detected!'
         })
+
+    output_json(total_result)
