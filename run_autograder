@@ -1,28 +1,71 @@
 #!/usr/bin/env python3
 
-import os, json
+import os, json, subprocess
 # from unittest import TestResult
 
-def exec_cmd(cmd):
-    r = os.popen(cmd)
-    text = r.read()
-    r.close()
-    print(text)
-    return text
+# def exec_cmd(cmd):
+#     r = os.popen(cmd)
+#     text = r.read()
+#     r.close()
+#     # print(text)
+#     return text
 
-def run_test(q_num):
+def bazel_test(task):
+    # test_cmd = 'bazel test coding_grader/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
+    test_cmd = [
+        'bazel',
+        'test',
+        task,
+        '--test_output=all',
+        '--test_timeout=270',
+        '--config=asan'
+    ]
+    test_output = ''
+    error_msg = ''
+    try:
+        test_output = subprocess.check_output(test_cmd, stderr=subprocess.STDOUT, timeout=300).decode()
+    except subprocess.TimeoutExpired as e:
+        test_output = e.output.decode()
+        error_msg = 'ERROR: Timeout expired!'
+    except subprocess.CalledProcessError as e:
+        test_output = e.output.decode()
+        if 'AddressSanitizer' in test_output:
+            error_msg = 'ERROR: Memory misuse detected!'
+        elif 'TIMEOUT' in test_output:
+            error_msg = 'ERROR: Timeout expired!'
+        elif 'FAILED TO BUILD' in test_output:
+            error_msg = 'ERROR: Bazel build error!'
+        else:
+            error_msg = 'Partially Incorrect...'
+    except Exception as e:
+        test_output = str(e)
+        error_msg = 'ERROR: Unknown error!'
 
-    cp_cmd = 'cp ../submission/files/' + q_num + '/q.cc coding_grader/' + q_num + '/'
-    test_cmd = 'bazel test coding_grader/' + q_num + ':grader_test --test_output=all --config=asan 2>&1'
+    return [test_output, error_msg]
 
+def run_test(q_num, student_test=False):
+    
+    tasks = ['coding_grader/' + q_num + ':grader_test']
+
+    os.system('cp ../submission/files/' + q_num + '/q.cc coding_grader/' + q_num + '/')
+    if student_test:
+        os.system('cp ../submission/files/' + q_num + '/student_test.cc coding_grader/' + q_num + '/')
+        tasks = ['coding_grader/' + q_num + ':student_test'] + tasks
     print('================================================================================\nQuestion ' + q_num + ' testing:')
-    exec_cmd(cp_cmd)
-    test_output = exec_cmd(test_cmd)
-
+    for task in tasks:
+        test_output, error_msg = bazel_test(task)
+        print(test_output + error_msg)
+        if task != tasks[-1] and error_msg != '':
+            return {
+                'passed':   0,
+                'failed':   0,
+                'error':    'Student test ' + error_msg,
+            }
+    
     return {
         'passed':           test_output.count('[       OK ]'),
         'failed':           test_output.count('FAIL'),
-        'memory_misuse':    test_output.count('AddressSanitizer'),
+        'error':            error_msg,
     }
 
 def output_json(score_obj):
@@ -46,6 +89,7 @@ if __name__ == '__main__':
     test_cases = {}
     total_result = []
     visible_list = []
+    student_test_list = []
 
     with open('questions.json', encoding='utf-8') as q:
         questions = json.load(q)
@@ -54,10 +98,11 @@ if __name__ == '__main__':
         full_score = questions.get('full_score')
         test_cases = questions.get('test_cases')
         visible_list = questions.get('visible_list')
+        student_test_list = questions.get('student_test_list')
     
     score_per_test = { q_num: (full_score[q_num] * 2 // test_cases[q_num]) / 2 for q_num in q_nums }
     for q_num in q_nums:
-        test_result = run_test(q_num)
+        test_result = run_test(q_num, q_num in student_test_list)
         score = 0.0
 
         if test_result['passed'] < test_cases[q_num]:
@@ -67,7 +112,7 @@ if __name__ == '__main__':
         else:                   # if this happens, student might cheat
             score = 0.0
 
-        if test_result['memory_misuse'] != 0:       # if memory misuse is detected, score will be deducted by 50%
+        if 'ERROR' in test_result['error']:       # score will be deducted by 50%
             score = (score * 2 + 1) // 2 / 2
         elif test_result['passed'] >= test_cases[q_num] and test_result['failed'] != 0:    # if this happens, student might cheat 
             score = 0.0
@@ -77,7 +122,7 @@ if __name__ == '__main__':
             'max_score':    full_score[q_num],
             'number':       q_num,
             'visibility':   'visible' if q_num in visible_list else 'after_due_date',
-            'output':       'Memory misuse detected!' if test_result['memory_misuse'] != 0 else 'No memory misuse detected!'
+            'output':       test_result['error']
         })
 
     output_json(total_result)
